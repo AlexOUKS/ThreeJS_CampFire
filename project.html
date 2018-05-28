@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>Computer Graphics Project</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel=stylesheet href="css/base.css"/>
+</head>
+<body>
+
+<script src="js/Three.js"></script>
+<script src="js/Detector.js"></script>
+<script src="js/stats.js"></script>
+
+<!-- shader for glowing light -->
+<script id="vertexShader" type="x-shader/x-vertex">
+uniform vec3 viewVector;
+uniform float c;
+uniform float p;
+varying float intensity;
+void main() 
+{
+    vec3 vNormal = normalize( normalMatrix * normal );
+	vec3 vNormel = normalize( normalMatrix * viewVector );
+	intensity = pow( c - dot(vNormal, vNormel), p );
+	
+    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+}
+</script>
+
+<!-- fragment shader a.k.a. pixel shader -->
+<script id="fragmentShader" type="x-shader/x-vertex"> 
+uniform vec3 glowColor;
+varying float intensity;
+void main() 
+{
+	vec3 glow = glowColor * intensity;
+    gl_FragColor = vec4( glow, 1.0 );
+}
+</script>
+
+<script src="js/OrbitControls.js"></script>
+<script src="js/THREEx.KeyboardState.js"></script>
+<script src="js/THREEx.FullScreen.js"></script>
+<script src="js/THREEx.WindowResize.js"></script>
+
+<script type="text/javascript" src="js/OBJLoader.js"></script>
+<script type="text/javascript" src="js/MTLLoader.js"></script>
+<script type="text/javascript" src="js/OBJMTLLoader.js"></script>
+
+<!-- jQuery code to display an information button and box when clicked. -->
+<script src="js/jquery-1.9.1.js"></script>
+<script src="js/jquery-ui.js"></script>
+<link rel=stylesheet href="jquery-ui.css" />
+<link rel=stylesheet href="info.css"/>
+<script src="js/info.js"></script>
+<div id="infoButton"></div>
+<div id="infoBox" title="Information">
+This three.js demo is a project of a course called "Computer Graphics".
+More info at <a href="https://github.com/AlexOUKS"> my GitHub </a>
+<br>
+<br>
+Made by Alexis OUKSEL & Theodora Kokkinou
+
+</div>
+<!-- ------------------------------------------------------------ -->
+
+<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+<script>
+
+// MAIN
+
+// standard global variables
+var container, scene, camera, renderer, controls, stats;
+var keyboard = new THREEx.KeyboardState();
+var clock = new THREE.Clock();
+var loader = new THREE.OBJLoader();
+var chair;
+var particleSystem, particleCount, particles;
+var cylinders = [];
+init();
+animate();
+
+// FUNCTIONS 		
+function init() 
+{	
+
+	windowSetup();
+	light();
+	objectAndMesh();
+	skybox();
+	particlesSetup();
+	campfire();
+	object3D();
+	audio();
+	fog();
+	fire();
+	
+	
+	// axes
+	var axes = new THREE.AxisHelper(100);
+	scene.add( axes );
+	
+}
+
+function animate() 
+{
+    requestAnimationFrame( animate );
+	render();		
+	update();
+}
+
+function update()
+{	
+	
+	var elapsed = clock.getElapsedTime();
+
+	if ( keyboard.pressed("z") ) 
+	{ 
+		// do something
+	}
+	
+	
+	// Animation the particles
+	particleSystem.position.y += 0.5;
+	particleSystem.rotation.y += 0.005;
+	particleSystem.material.opacity -= 0.001;
+	
+	if (particleSystem.position.y > 100 && particleSystem.material.opacity < 0) {
+		particleSystem.position.y = 0;
+		particleSystem.material.opacity = 1;
+		particleSystem.rotation.y = 0;
+	}
+
+	particleSystem.material.opacity -= 0.001;
+		
+		
+	// Animation of the glowing fire
+	moonGlow.rotation.y += 0.05;
+	moonGlow2.rotation.y -= 0.05;
+	moonGlow3.rotation.y += 0.05;
+		
+	moonGlow.position.y = Math.sin( elapsed * 1.1 )* 10;
+	
+	// Animation of the chair
+	chair.rotation.z = Math.sin( elapsed * 0.5 ) / 2;
+	
+	// Movement of the camera
+	camera.position.set(
+		Math.sin( elapsed * 0.1 ) * 1000,
+		Math.sin( elapsed * 0.5 ) * 1 + 200,
+		Math.cos( elapsed * 0.1 ) * 400
+	); 
+
+	camera.lookAt( scene.position );
+
+	// draw
+	renderer.render(scene, camera);
+
+	
+	controls.update();
+	stats.update();
+}
+
+function render() 
+{
+	renderer.render( scene, camera );
+}
+
+function windowSetup() {
+	// SCENE
+	scene = new THREE.Scene();
+	var clock = new THREE.Clock();
+	
+	// CAMERA
+	var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+	var VIEW_ANGLE = 45, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 20000;
+	camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+	scene.add(camera);
+	camera.position.set(0,150,400);
+	camera.lookAt(scene.position);	
+	
+	// RENDERER
+	if ( Detector.webgl )
+		renderer = new THREE.WebGLRenderer( {antialias:true} );
+	else
+		renderer = new THREE.CanvasRenderer(); 
+	renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+	container = document.getElementById( 'ThreeJS' );
+	container.appendChild( renderer.domElement );
+	
+	// EVENTS
+	THREEx.WindowResize(renderer, camera);
+	THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) });
+	
+	// CONTROLS
+	controls = new THREE.OrbitControls( camera, renderer.domElement );
+	
+	// STATS
+	stats = new Stats();
+	stats.domElement.style.position = 'absolute';
+	stats.domElement.style.bottom = '0px';
+	stats.domElement.style.zIndex = 100;
+	container.appendChild( stats.domElement );
+}
+
+function light() {
+	var light = new THREE.PointLight(0xe74c3c,3);
+	light.position.set(0,20,0);
+	scene.add(light);
+	}
+
+function objectAndMesh() {
+	// FLOOR
+	var floorTexture = new THREE.ImageUtils.loadTexture( 'textures/floor.jpg' );
+	var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+	var floorGeometry = new THREE.PlaneGeometry(4000, 4000, 10, 10);
+	var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+	floor.position.y = -0.5;
+	floor.rotation.x = Math.PI / 2;
+	scene.add(floor);
+}
+
+function skybox() {
+	var imagePrefix = "textures/nightsky_";
+	var directions  = ["ft", "bk", "up", "dn", "rt", "lf"];
+	var imageSuffix = ".jpg";
+	var skyGeometry = new THREE.CubeGeometry( 5000, 5000, 5000 );	
+	
+	var materialArray = [];
+	for (var i = 0; i < 6; i++)
+		materialArray.push( new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( skyBox );
+}
+
+function particlesSetup() {
+
+	// create the particle variables
+	particleCount = 50,
+	particles = new THREE.Geometry(),
+	pMaterial = new THREE.ParticleBasicMaterial({
+	  color: 0xFFFFFF,
+	  size: 20,
+	  map: THREE.ImageUtils.loadTexture(
+		"textures/particle.png"
+	  ),
+	  blending: THREE.AdditiveBlending,
+	  transparent: true
+	});
+
+	// now create the individual particles
+	for (var p = 0; p < particleCount; p++) {
+
+		// create a particle with random
+		// position values, -250 -> 250
+		var pX = Math.random() * 50 - 50,
+		pY = Math.random() * 100 - 100,
+		pZ = Math.random() * 50 - 50,
+		particle = new THREE.Vertex(
+			new THREE.Vector3(pX, pY, pZ)
+		);
+
+		// add it to the geometry
+		// create a velocity vector
+		particle.velocity = new THREE.Vector3(
+		  0,              // x
+		  -Math.random(), // y: random vel
+		  0);             // z
+		  particles.vertices.push(particle);
+	}
+
+	// create the particle system
+	 particleSystem = new THREE.ParticleSystem(
+		particles,
+		pMaterial);
+
+		particleSystem.position.x = 40;
+		
+	// add it to the scene
+	scene.add(particleSystem);
+}
+
+function campfire() {
+
+	// Woods cylinder
+	
+	for (i = 1; i < 8; i++) {
+		var geometry = new THREE.CylinderGeometry( 5, 5, 80, 32 );
+		var woodTexture = new THREE.ImageUtils.loadTexture( 'textures/burned wood.jpg' );
+		var material = new THREE.MeshBasicMaterial( { map: woodTexture, side: THREE.DoubleSide } );
+		var cylinder = new THREE.Mesh( geometry, material );
+		scene.add( cylinder );
+		cylinder.position.y = 5;
+		cylinder.rotation.x = Math.PI / 2;
+		cylinder.rotation.z = i*Math.PI / 6;	
+		cylinders.push(cylinder);
+	}
+
+	cylinder.rotation.x = Math.PI / 2;
+	cylinder.rotation.z = Math.PI / 3;	
+
+	var geometry = new THREE.CylinderGeometry( 2, 2, 80, 32 );
+	var woodTexture = new THREE.ImageUtils.loadTexture( 'textures/metal-rust.jpg' );
+	var material = new THREE.MeshBasicMaterial( { map: woodTexture, side: THREE.DoubleSide } );
+	var cylinder = new THREE.Mesh( geometry, material );
+	scene.add( cylinder );
+	cylinder.position.y = 5;
+	cylinder.rotation.Y = Math.PI / 2;
+
+	var geometry = new THREE.CylinderGeometry( 5, 5, 140, 32 );
+	var woodTexture = new THREE.ImageUtils.loadTexture( 'textures/wood.jpg' );
+	var material = new THREE.MeshBasicMaterial( { map: woodTexture, side: THREE.DoubleSide } );
+	var cylinder = new THREE.Mesh( geometry, material );
+	scene.add( cylinder );
+	cylinder.position.y = 5;
+	cylinder.position.x = 50;
+	cylinder.rotation.z = Math.PI / 4;
+	
+	var geometry = new THREE.CylinderGeometry( 5, 5, 140, 32 );
+	var cylinder = new THREE.Mesh( geometry, material );
+	scene.add( cylinder );
+	cylinder.position.y = 5;
+	cylinder.position.x = -50;
+	cylinder.rotation.z = Math.PI / 4;
+	cylinder.rotation.x = Math.PI;
+	
+	var geometry = new THREE.CylinderGeometry( 5, 5, 140, 32 );
+	var cylinder = new THREE.Mesh( geometry, material );
+	scene.add( cylinder );
+	cylinder.position.y = 5;
+	cylinder.position.z = -50;
+	cylinder.rotation.z = Math.PI / 4;
+	cylinder.rotation.y = Math.PI/2;
+	
+	var geometry = new THREE.CylinderGeometry( 5, 5, 140, 32 );
+	var cylinder = new THREE.Mesh( geometry, material );
+	scene.add( cylinder );
+	cylinder.position.y = 5;
+	cylinder.position.z = 50;
+	cylinder.rotation.z = Math.PI / 4;
+	cylinder.rotation.y = -Math.PI/2;
+	
+	// stones
+	
+	// load a resource
+	loader.load(
+		// resource URL
+		'models/Rock1.obj',
+		// called when resource is loaded
+		function ( object ) {
+
+			object.rotation.x = Math.PI / 38;
+			object.position.z = 20;
+			object.position.x = 50;
+			object.scale.set(9,9,9);
+			 
+			scene.add( object );
+		}
+	);
+}
+
+function object3D() {
+	// Tent
+	loader.load(
+		// resource URL
+		'models/dome_tent.obj',
+		// called when resource is loaded
+		function ( object ) {
+			
+			object.rotation.x = Math.PI / 38;
+			object.position.z = 20;
+			object.position.x = 200;
+			object.position.z = -140;
+			object.rotation.y = -Math.PI/3;
+			var material = new THREE.MeshPhongMaterial( {color : "#009432"} );
+			object.traverse( function ( child ) {
+
+				if ( child instanceof THREE.Mesh ) {
+
+						child.material = material;
+
+					}
+
+				} );
+			 
+			scene.add( object );
+		}
+	);
+
+	// Sofa
+	loader.load(
+		// resource URL
+		'models/Leather_Sofa.obj',
+		// called when resource is loaded
+		function ( object ) {
+
+			
+			object.position.z = 80;
+			object.position.x = -120;
+			object.position.y = 0;
+			object.scale.set(30,30,30);
+			object.rotation.y = Math.PI / 1.5 ;
+			var leather = new THREE.ImageUtils.loadTexture( 'textures/leather.jpg' );
+			var material = new THREE.MeshBasicMaterial( { map: leather, side: THREE.DoubleSide } );
+			object.traverse( function ( child ) {
+
+				if ( child instanceof THREE.Mesh ) {
+		
+						child.material = material;
+
+					}
+
+				} );
+			 
+			scene.add( object );
+		}
+	);
+		
+	// Wood Chair
+	loader.load(
+	// resource URL
+	'models/chair.obj',
+	// called when resource is loaded
+	function ( object ) {
+		
+		chair = object;
+		object.position.z = 130;
+		object.position.x = 40;
+		object.position.y = 50;
+		object.rotation.y = -Math.PI/3;
+		object.scale.set(6,6,6);
+		
+		var leather = new THREE.ImageUtils.loadTexture( 'textures/wood.jpg' );
+		var material = new THREE.MeshBasicMaterial( { map: leather, side: THREE.DoubleSide } );
+		object.traverse( function ( child ) {
+
+			if ( child instanceof THREE.Mesh ) {
+	
+					child.material = material;
+
+				}
+
+			} );
+		 
+		scene.add( object );
+	});
+	
+	// Table
+	loader.load(
+	// resource URL
+	'models/table.obj',
+	// called when resource is loaded
+	function ( object ) {
+		
+		var table = object;
+		object.position.z = -130;
+		object.position.x = -50;
+		object.position.y = 25;
+		object.rotation.y = Math.PI/6;
+		
+		
+		var leather = new THREE.ImageUtils.loadTexture( 'textures/darker_wood.jpg' );
+		var material = new THREE.MeshBasicMaterial( { map: leather, side: THREE.DoubleSide } );
+		object.traverse( function ( child ) {
+
+			if ( child instanceof THREE.Mesh ) {
+	
+					child.material = material;
+
+				}
+
+			} );
+		 
+		scene.add( object );
+	});
+}
+
+function audio() {
+	var audio = new Audio('sound/firecracking.mp3');
+	audio.loop = true;
+	audio.play();
+}
+
+function fog() {
+	var varColor = 0x000000;
+	var varNear = 1000;
+	var varFar = 4000;
+
+	scene.fog = new THREE.Fog( varColor, varNear, varFar);
+}
+
+function fire() {
+
+	var sphereGeom = new THREE.SphereGeometry(25, 32, 16);
+    
+	var moonTexture = THREE.ImageUtils.loadTexture( 'textures/plaster.jpg' );
+	var moonMaterial = new THREE.MeshBasicMaterial( { map: moonTexture } );
+    var moon = new THREE.Mesh(sphereGeom, moonMaterial);
+	moon.position.set(0,-30,0);
+	moon.material.transparent = true;
+	moon.material.opacity = 0;
+	
+    scene.add(moon);
+
+	// create custom material from the shader code above
+	//   that is within specially labeled script tags
+	var customMaterial = new THREE.ShaderMaterial( 
+	{
+	    uniforms: 
+		{ 
+			"c":   { type: "f", value: 1.0 },
+			"p":   { type: "f", value: 1.4 },
+			glowColor: { type: "c", value: new THREE.Color(0xe74c3c) },
+			viewVector: { type: "v3", value: camera.position }
+		},
+		vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
+		fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+		side: THREE.FrontSide,
+		blending: THREE.AdditiveBlending,
+		transparent: true
+	}   );
+		
+	this.moonGlow = new THREE.Mesh( sphereGeom.clone(), customMaterial.clone() );
+    moonGlow.position = moon.position;
+	moonGlow.scale.multiplyScalar(1.2);
+	scene.add( moonGlow );
+	this.moonGlow2 = new THREE.Mesh( sphereGeom.clone(), customMaterial.clone() );
+    moonGlow2.position = moon.position;
+	moonGlow2.scale.multiplyScalar(1.4);
+	scene.add( moonGlow2 );
+	this.moonGlow3 = new THREE.Mesh( sphereGeom.clone(), customMaterial.clone() );
+    moonGlow3.position = moon.position;
+	moonGlow3.scale.multiplyScalar(0.9);
+	scene.add( moonGlow3 );
+}
+</script>
+
+</body>
+</html>
